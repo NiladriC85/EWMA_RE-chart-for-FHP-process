@@ -32,21 +32,23 @@ find_L <- function(m, n, p, lambda, rho, B, sim, FAP0, aux_sims = 5000, tol = 1e
   B <<- B
   sim <<- sim
   
-  compute_RE <- function(x, y, grid) {
-    comdata <- rbind(x, y)
-    A2 <- rowSums(comdata^2)
-    B2 <- rowSums(grid^2)
-    distmat <- outer(A2, B2, "+") - 2 * (comdata %*% t(grid))
-    assignment <- solve_LSAP(distmat)
-    sel <- grid[assignment, , drop = FALSE]
-    eqdist.etest(sel, sizes = c(nrow(x), nrow(y)), R = 1)$statistic
+  compute_RE=function(x,y,m=nrow(x),n=nrow(y),dim=ncol(x),gridch=torus(m+n,dim))
+  {
+    comdata=rbind(x,y)
+    distmat=matrix(0,nrow=m+n,ncol=m+n)
+    for(i in 1:(m+n))
+      distmat[i,]=apply((comdata[i,]-t(gridch)),2,Norm)^2
+    assignmentFUN=solve_LSAP(distmat)
+    assignmentSOL=cbind(seq_along(assignmentFUN),assignmentFUN)
+    randenergySTAT=eqdist.etest(gridch[assignmentSOL[,2],],sizes = c(m,n), R=1)
+    return(randenergySTAT$statistic)
   }
   
   t_stat <- function() {
     s1 <- mvrnorm(m, mu0, sigma)
     s2 <- mvrnorm(n, mu0, sigma)
     grid <- torus(m + n, p)
-    as.numeric(compute_RE(s1, s2, grid))
+    as.numeric(compute_RE(s1, s2))
   }
   
   RE_auxiliary <- replicate(aux_sims, t_stat())
@@ -61,7 +63,7 @@ find_L <- function(m, n, p, lambda, rho, B, sim, FAP0, aux_sims = 5000, tol = 1e
     EWMA[1] <- lambda * RE[1] + (1 - lambda) * mean_RE
     for (k in 2:B) {
       s2 <- mvrnorm(n, mu0, sigma)
-      RE[k] <- as.numeric(compute_RE(s1, s2, grid))
+      RE[k] <- as.numeric(compute_RE(s1, s2))
       EWMA[k] <- lambda * RE[k] + (1 - lambda) * EWMA[k - 1]
     }
     max(EWMA)
@@ -103,9 +105,6 @@ L_star
 
 lambda <- 0.5
 quantile(replicate(sim, conditional_FAP(3.084, m, n, p, rho)), 0.95)
-
-
-
 
 
 
